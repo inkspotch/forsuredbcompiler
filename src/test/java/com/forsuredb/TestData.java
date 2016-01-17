@@ -22,6 +22,9 @@ import com.forsuredb.annotationprocessor.info.ColumnInfo;
 import com.forsuredb.annotationprocessor.info.ForeignKeyInfo;
 import com.forsuredb.annotationprocessor.TableContext;
 import com.forsuredb.annotationprocessor.info.TableInfo;
+import com.forsuredb.migration.Migration;
+import com.google.common.base.Strings;
+import com.google.common.collect.Maps;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -31,19 +34,24 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * <p>
+ *     Provides some reasonable abstractions for table, column, and migrations that makes
+ *     test code and setup read better.
+ * </p>
+ */
 public class TestData {
 
     public static final String TEST_RES = "src/test/resources";
+
+    // Convenience constants
     public static final ColumnInfo[] DEFAULT_COLUMNS = new ColumnInfo[] {
             TestData.idCol(),
             TestData.createdCol(),
             TestData.deletedCol(),
             TestData.modifiedCol()
     };
-
-    // Convenience constants
-    public static final String TABLE_NAME = "test_table";
-    public static final String TABLE_CLASS_NAME = "com.fsryan.test.TestTable";
+    public static final Map<String, ColumnInfo> DEFAULT_COLUMNS_MAP = columnMapOf(DEFAULT_COLUMNS);
 
     public static String resourceText(String resourceName) throws IOException {
         BufferedReader br = new BufferedReader(new FileReader(TEST_RES + File.separator + resourceName));
@@ -57,10 +65,6 @@ public class TestData {
     }
 
     // Convenience methods for making data to go into the tests
-    public static TableInfo.Builder table() {
-        return TableInfo.builder().tableName(TABLE_NAME)
-                .qualifiedClassName(TABLE_CLASS_NAME);
-    }
 
     public static Map<String, ColumnInfo> columnMapOf(ColumnInfo... columns) {
         Map<String, ColumnInfo> retMap = new HashMap<>();
@@ -76,6 +80,59 @@ public class TestData {
             retMap.put(table.getTableName(), table);
         }
         return retMap;
+    }
+
+    public static TableContextBuilder tableContextBase(TableInfo... tables) {
+        TableInfo baseTable = table("table_1", "com.fsryan.test.Table1", stringCol().columnName("table_1_string").build()).build();
+        TableContextBuilder tcb = new TableContextBuilder().addTable(baseTable);
+        for (TableInfo table : tables) {
+            tcb.addTable(table);
+        }
+        return tcb;
+    }
+
+    public static TableInfo.Builder table() {
+        return table("test_table", "com.fsryan.test.TestTable");
+    }
+
+    public static TableInfo.Builder table(String tableName, String tableClassName, ColumnInfo... columns) {
+        Map<String, ColumnInfo> columnMap = Maps.newHashMap(DEFAULT_COLUMNS_MAP);
+        columnMap.putAll(columnMapOf(columns));
+        return TableInfo.builder().tableName(Strings.isNullOrEmpty(tableName) ? "test_table" : tableName)
+                .qualifiedClassName(Strings.isNullOrEmpty(tableClassName) ? "com.fsryan.test.TestTable" : tableClassName)
+                .columnMap(columnMap);
+    }
+
+    public static Migration createTableMigration(String tableName) {
+        return tableMigration(tableName).type(Migration.Type.CREATE_TABLE).build();
+    }
+
+    public static Migration dropTableMigration(String tableName) {
+        return tableMigration(tableName).type(Migration.Type.DROP_TABLE).build();
+    }
+
+    public static Migration addColumnMigration(String tableName, String columnName) {
+        return columnMigration(tableName, columnName).type(Migration.Type.ALTER_TABLE_ADD_COLUMN).build();
+    }
+
+    public static Migration dropColumnMigration(String tableName, String columnName) {
+        return columnMigration(tableName, columnName).type(Migration.Type.DROP_COLUMN).build();
+    }
+
+    public static Migration dropReferencedColumnMigration(String tableName, String columnName) {
+        return columnMigration(tableName, columnName).type(Migration.Type.DROP_REFERENCED_COLUMN).build();
+    }
+
+    public static Migration addForeignKeyMigration(String tableName, String columnName) {
+        return  columnMigration(tableName, columnName).type(Migration.Type.ADD_FOREIGN_KEY_REFERENCE).build();
+    }
+
+    public static Migration addUniqueColumnMigration(String tableName, String columnName) {
+        return  columnMigration(tableName, columnName).type(Migration.Type.ALTER_TABLE_ADD_UNIQUE).build();
+    }
+
+    public static Migration addUniqueIndexMigration(String tableName, String columnName) {
+        return  columnMigration(tableName, columnName).type(Migration.Type.ADD_UNIQUE_INDEX).build();
     }
 
     public static ColumnInfo idCol() {
@@ -262,6 +319,14 @@ public class TestData {
                                 .tableName("test_table_3")
                                 .build())
                 .build();
+    }
+
+    private static Migration.Builder columnMigration(String tableName, String columnName) {
+        return tableMigration(tableName).columnName(columnName);
+    }
+
+    private static Migration.Builder tableMigration(String tableName) {
+        return Migration.builder().tableName(tableName);
     }
 
     public static class TableContextBuilder {
