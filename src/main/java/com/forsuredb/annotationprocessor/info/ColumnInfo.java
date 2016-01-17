@@ -94,6 +94,10 @@ public class ColumnInfo implements Comparable<ColumnInfo> {
         return defaultValue != null && !defaultValue.isEmpty();
     }
 
+    public boolean isReferencedColumn() {
+        return false;   // TODO
+    }
+
     @Override
     public int compareTo(ColumnInfo other) {
         // handle null cases
@@ -130,7 +134,6 @@ public class ColumnInfo implements Comparable<ColumnInfo> {
      * </p>
      * @param allTables
      */
-    /*package*/
     public void enrichWithForeignTableInfoFrom(List<TableInfo> allTables) {
         if (!isForeignKey()) {
             return;
