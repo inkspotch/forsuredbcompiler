@@ -32,7 +32,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import static com.forsuredb.TestData.*;
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 @RunWith(Parameterized.class)
@@ -59,183 +58,95 @@ public class DiffGeneratorTest {
     public static Iterable<Object[]> data() {
         return Arrays.asList(new Object[][] {
                 // No diff (identical contexts)
-                {
+                {   // 0
                         4,
-                        newTableContext().addTable(table().columnMap(columnMapOf(intCol().build(), stringCol().build()))
-                                        .build())
-                                .build(),
-                        newTableContext().addTable(table().columnMap(columnMapOf(intCol().build(), stringCol().build()))
-                                        .build())
-                                .build(),
+                        tableContextBase().build(),
+                        tableContextBase().build(),
                         MigrationSet.builder().dbVersion(5)
                                 .orderedMigrations(new ArrayList<Migration>())
+                                .targetSchema(tableContextBase().build().tableMap())
                                 .build()
                 },
                 // The processing context has a table that the migration context does not have--table has no extra columns
-                {
+                {   // 1
                         1,
-                        newTableContext().build(),
-                        newTableContext().addTable(table().build())
-                                .build(),
+                        tableContextBase().build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2").build()).build(),
                         MigrationSet.builder().dbVersion(2)
-                                .orderedMigrations(Lists.newArrayList(Migration.builder().type(Migration.Type.CREATE_TABLE)
-                                        .tableName(TABLE_NAME)
-                                        .build()))
-                                .targetSchema(tableMapOf(table().build()))
+                                .orderedMigrations(Lists.newArrayList(createTableMigration("table_2")))
+                                .targetSchema(tableContextBase(table("table_2", "com.fsryan.test.Table2").build()).build().tableMap())
                                 .build()
                 },
                 // The processing context has a table that the migration context does not have--table has extra columns
-                {
+                {   // 2
                         10,
-                        newTableContext().build(),
-                        newTableContext().addTable(table().columnMap(columnMapOf(intCol().build(), stringCol().build()))
-                                        .build())
-                                .build(),
+                        tableContextBase().build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2", stringCol().build(), intCol().build()).build()).build(),
                         MigrationSet.builder().dbVersion(11)
-                                .orderedMigrations(Lists.newArrayList(Migration.builder().type(Migration.Type.CREATE_TABLE)
-                                                .tableName(TABLE_NAME)
-                                                .build(),
-                                        Migration.builder().type(Migration.Type.ALTER_TABLE_ADD_COLUMN)
-                                                .tableName(TABLE_NAME)
-                                                .columnName(stringCol().build().getColumnName())
-                                                .build(),
-                                        Migration.builder().type(Migration.Type.ALTER_TABLE_ADD_COLUMN)
-                                                .tableName(TABLE_NAME)
-                                                .columnName(intCol().build().getColumnName())
-                                                .build()))
-                                .targetSchema(tableMapOf(table().columnMap(columnMapOf(intCol().build(), stringCol().build()))
-                                .build()))
+                                .orderedMigrations(Lists.newArrayList(createTableMigration("table_2"),
+                                        addColumnMigration("table_2", stringCol().build().getColumnName()),
+                                        addColumnMigration("table_2", intCol().build().getColumnName())))
+                                .targetSchema(tableContextBase(table("table_2", "com.fsryan.test.Table2", stringCol().build(), intCol().build()).build()).build().tableMap())
                                 .build()
                 },
                 // The processing context has a non-unique, non foreign-key column that the migration context does not have
-                {
+                {   // 3
                         3,
-                        newTableContext().addTable(table().build())
-                                .build(),
-                        newTableContext().addTable(table()
-                                        .columnMap(columnMapOf(bigDecimalCol().build()))
-                                        .build())
-                                .build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2").build()).build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2", longCol().build()).build()).build(),
                         MigrationSet.builder().dbVersion(4)
-                                .orderedMigrations(Lists.newArrayList(Migration.builder().type(Migration.Type.ALTER_TABLE_ADD_COLUMN)
-                                        .tableName(TABLE_NAME)
-                                        .columnName(bigDecimalCol().build().getColumnName())
-                                        .build()))
-                                .targetSchema(tableMapOf(table()
-                                        .columnMap(columnMapOf(bigDecimalCol().build()))
-                                        .build()))
+                                .orderedMigrations(Lists.newArrayList(addColumnMigration("table_2", longCol().build().getColumnName())))
+                                .targetSchema(tableContextBase(table("table_2", "com.fsryan.test.Table2", longCol().build()).build()).build().tableMap()    )
                                 .build()
                 },
                 // The processing context has a foreign key the migration context does not know about (default delete and update actions)
-                {
+                {   // 4
                         2,
-                        newTableContext().addTable(table().build()).build(),
-                        newTableContext()
-                                .addTable(table().columnMap(columnMapOf(longCol().foreignKeyInfo(cascadeFKI("user")
-                                                        .build())
-                                                .build()))
-                                        .build())
-                                .build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2").build()).build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2", longCol().foreignKeyInfo(cascadeFKI("_id").build()).build()).build()).build(),
                         MigrationSet.builder().dbVersion(3)
-                                .orderedMigrations(Lists.newArrayList(Migration.builder().type(Migration.Type.ADD_FOREIGN_KEY_REFERENCE)
-                                        .tableName(TABLE_NAME)
-                                        .columnName(longCol().build().getColumnName())
-                                        .build()))
-                                .targetSchema(tableMapOf(table().columnMap(columnMapOf(longCol().foreignKeyInfo(cascadeFKI("user")
-                                                        .build())
-                                                .build()))
-                                        .build()))
+                                .orderedMigrations(Lists.newArrayList(addForeignKeyMigration("table_2", longCol().build().getColumnName())))
+                                .targetSchema(tableContextBase(table("table_2", "com.fsryan.test.Table2", longCol().foreignKeyInfo(cascadeFKI("_id").build()).build()).build()).build().tableMap())
                                 .build()
                 },
                 // The processing context has a unique index column the migration context doesn't know about
-                {
+                {   // 5
                         4364,
-                        newTableContext().addTable(table().build())
-                                .build(),
-                        newTableContext()
-                                .addTable(table().columnMap(columnMapOf(stringCol().unique(true)
-                                                .build()))
-                                        .build())
-                                .build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2").build()).build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2", stringCol().unique(true).build()).build()).build(),
                         MigrationSet.builder().dbVersion(4365)
-                                .orderedMigrations(Lists.newArrayList(Migration.builder().type(Migration.Type.ALTER_TABLE_ADD_UNIQUE)
-                                        .tableName(TABLE_NAME)
-                                        .columnName(stringCol().build().getColumnName())
-                                        .build()))
-                                .targetSchema(tableMapOf(table().columnMap(columnMapOf(stringCol().unique(true)
-                                                .build()))
-                                        .build()))
+                                .orderedMigrations(Lists.newArrayList(addUniqueColumnMigration("table_2", stringCol().build().getColumnName())))
+                                .targetSchema(tableContextBase(table("table_2", "com.fsryan.test.Table2", stringCol().unique(true).build()).build()).build().tableMap())
                                 .build()
                 },
                 // The processing context has a unique index on a column the migration context knows about, but doesn't know is unique
-                {
+                {   // 6
                         8,
-                        newTableContext().addTable(table().columnMap(columnMapOf(stringCol().build()))
-                                        .build())
-                                .build(),
-                        newTableContext()
-                                .addTable(table().columnMap(columnMapOf(stringCol().unique(true)
-                                                .build()))
-                                        .build())
-                                .build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2", stringCol().build()).build()).build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2", stringCol().unique(true).build()).build()).build(),
                         MigrationSet.builder().dbVersion(9)
-                                .orderedMigrations(Lists.newArrayList(Migration.builder().type(Migration.Type.ADD_UNIQUE_INDEX)
-                                        .tableName(TABLE_NAME)
-                                        .columnName(stringCol().build().getColumnName())
-                                        .build()))
-                                .targetSchema(tableMapOf(table().columnMap(columnMapOf(stringCol().unique(true)
-                                                .build()))
-                                        .build()))
+                                .orderedMigrations(Lists.newArrayList(addUniqueIndexMigration("table_2", stringCol().build().getColumnName())))
+                                .targetSchema(tableContextBase(table("table_2", "com.fsryan.test.Table2", stringCol().unique(true).build()).build()).build().tableMap())
                                 .build()
                 },
-                // The processing does not have a table the migration context knows about (a table deletion)
-                {
+                // The processing context does not have a table the migration context knows about (a table deletion)
+                {   // 7
                         47,
-                        newTableContext()
-                                .addTable(table()
-                                        .tableName("table_1")
-                                        .columnMap(columnMapOf(
-                                                idCol(),
-                                                modifiedCol(),
-                                                createdCol(),
-                                                deletedCol(),
-                                                stringCol().columnName("table_1_string").build()))
-                                        .build())
-                                .addTable(table()
-                                        .tableName("table_2")
-                                        .columnMap(columnMapOf(
-                                                idCol(),
-                                                modifiedCol(),
-                                                createdCol(),
-                                                deletedCol(),
-                                                stringCol().columnName("table_2_string").build()))
-                                        .build())
-                                .build(),
-                        newTableContext()
-                                .addTable(table()
-                                        .tableName("table_2")
-                                        .columnMap(columnMapOf(
-                                                idCol(),
-                                                modifiedCol(),
-                                                createdCol(),
-                                                deletedCol(),
-                                                stringCol().columnName("table_2_string").build()))
-                                        .build())
-                                .build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2", stringCol().columnName("table_2_string").build()).build()).build(),
+                        tableContextBase().build(),
                         MigrationSet.builder().dbVersion(48)
-                                .orderedMigrations(Lists.newArrayList(Migration.builder()
-                                        .type(Migration.Type.DROP_TABLE)
-                                        .tableName("table_1")
-                                        .build()))
-                                .targetSchema(tableMapOf(table()
-                                        .tableName("table_2")
-                                        .columnMap(columnMapOf(
-                                                idCol(),
-                                                modifiedCol(),
-                                                createdCol(),
-                                                deletedCol(),
-                                                stringCol().columnName("table_2_string").build()))
-                                        .build()))
+                                .orderedMigrations(Lists.newArrayList(dropTableMigration("table_2")))
+                                .targetSchema(tableContextBase().build().tableMap())
+                                .build()
+                },
+                // The processing context does not have a column the migration context knows about (a column deletion)
+                {   // 8
+                        91,
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2", stringCol().columnName("table_2_string").build()).build()).build(),
+                        tableContextBase(table("table_2", "com.fsryan.test.Table2").build()).build(),
+                        MigrationSet.builder().dbVersion(92)
+                                .orderedMigrations(Lists.newArrayList(dropColumnMigration("table_2", "table_2_string")))
+                                .targetSchema(tableContextBase(table("table_2", "com.fsryan.test.Table2").build()).build().tableMap())
                                 .build()
                 }
         });
